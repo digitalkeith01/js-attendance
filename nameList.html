@@ -1,0 +1,52 @@
+<html>
+<script>
+	// ******************************************************************
+	// Enter names into double quotes (""), separated with comma (,)
+	// ******************************************************************
+	var names = ["John", "Paul", "George", "Ringo"];
+	// ******************************************************************
+	// End of Cutomizable Values
+	// ******************************************************************
+	names.sort();
+	
+	function concat() {
+		var finalStr = "";
+		for (i=0; i<names.length; i++) {
+			if (document.getElementById("n"+i).checked) {
+				finalStr += ((finalStr=="")?"":", ") + names[i];
+			}
+		}
+		document.getElementById("display").value = finalStr;
+	}
+	
+	function setAll(check) {
+		for (i=0; i<names.length; i++) {
+			document.getElementById("n"+i).checked = check;
+		}
+		concat();
+	}
+	
+	function copyToClipboard() {
+		var copyText = document.getElementById("display");
+		copyText.select();
+		copyText.setSelectionRange(0, 99999)
+		document.execCommand("copy");
+		alert("Copied the text: " + copyText.value);
+	}
+</script>
+
+<body>
+	<form>
+		<button onclick="setAll(true); return false;"> All </button>
+		<button onclick="setAll(false); return false;"> None </button>
+		<br/>
+		<script>
+			for (i=0; i<names.length; i++) {
+				document.write('<input id="n' + i + '" type="checkbox" onclick="concat();">' + names[i] + '</input> ');
+			}
+		</script>
+		<br/><br/><input type="text" id="display">
+		<br/><br/><button onclick="copyToClipboard(); return false;"> Copy to Clipboard </button>
+	</form>
+</body>
+</html>

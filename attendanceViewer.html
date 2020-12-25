@@ -1,0 +1,401 @@
+
+<html>
+	<head>
+		<script>
+			// *************************************************************
+			// Customizable Values
+			// *************************************************************
+			const NEW_SIGN = "*New"; // Text to indicate new member (e.g. "*" or "*New*")
+			const PASS_RATE = 75; // Passing percentage (e.g. 75)
+			const DECI_PLACE = 1; // Decimal placing (e.g. 1 or 2)
+			const DATE_DISPLAY_TIME = 2500; // Date display time after mouse out in milliseconds (e.g. 1000 = 1 sec.)
+			// *************************************************************
+			// End of Cutomizable Values
+			// *************************************************************
+
+			// Constant Values
+			const PRESENT = "O"; // Present Symbol
+			const ABSENT = "X"; // Absent Symbol
+			const INDEX_OF_DATE = 1;
+			const INDEX_OF_GROUP = 2;
+			const INDEX_OF_NAMELIST = 3;
+			const INDEX_OF_NEWCOMERLIST = 4;
+			const NUMBER_OF_FIELDS_B4_ATTENDANCE = 4; // Num of fields before attendance record
+
+			// Sort by 1st Columan
+			function sortByFirstColumn(a, b) {
+				if (a[0] === b[0]) {
+					return 0;
+				}
+				else {
+					return (a[0] < b[0]) ? -1 : 1;
+				}
+			}
+
+			// Set Date
+			function setDate(obj, displayDate) {
+				var totalTime = 1600; // Total time in milliseconds
+				var step = 5; // Motion step (totalTime and 100 must be multiple of steps)
+				var motion = 100/step;
+
+				obj.innerHTML = displayDate;
+				setInterval(function(){ while(motion<=100) {obj.style.fontSize=`${motion+=(100/step)}%`;} }, totalTime/step);	
+			}
+			// Set empty
+			function setEmpty(obj) {
+				var totalTime = 2500; // Total time in milliseconds
+				var step = 5; // Motion step (totalTime and 100 must be multiple of step)
+				var motion = 100;
+
+				setInterval(function(){ obj.style.fontSize=`${motion-=(100/step)}%`; }, totalTime/step);
+				setTimeout(function(){ obj.innerHTML=""; }, totalTime); // Empty
+			}
+
+			// Generate Report
+			function generate(groupFilter) {
+				var fullText;
+				var rawLines;
+				var lines = new Array();
+				var tempYear, tempMonth, tempDate;
+				var dateArray = new Array();
+
+				document.getElementById("inputPanel").style.display = "none";
+
+				// Split by EOL (Win, Mac or Unix)
+				fullText = document.getElementById("data").value.trim()+"\t\t";
+				fullText = fullText.split("\r\n").join("\n"); // Convert Win (CR LF) to Unix (LF)
+				fullText = fullText.split("\r").join("\n"); // Convert Mac (CR) to Unix (LF)
+				rawLines = fullText.split("\n"); // Lines
+				
+				// Split by Tab - timestamp, date, group, nameList
+				for (var all=0; all<rawLines.length; all++) {
+					lines.push(rawLines[all].split("\t"));
+				}
+
+				for (var all=1; all<lines.length; all++) {
+					// Convert Date Format to YYYY-MM-DD (from M/D/YYYY)
+					// Change this part if the input date format is different
+					tempMonth = lines[all][INDEX_OF_DATE].split("/")[0];
+					tempDate = lines[all][INDEX_OF_DATE].split("/")[1];
+					tempYear = lines[all][INDEX_OF_DATE].split("/")[2];
+				
+					lines[all][1] = tempYear + "-" + 
+								  ((tempMonth < 10)?"0"+tempMonth:tempMonth) + "-" + 
+								  ((tempDate < 10)?"0"+tempDate:tempDate);
+
+					// Push all dates in
+					dateArray.push(lines[all][INDEX_OF_DATE]);
+				}
+				// Distinct (by Set) and sort
+				dateArray = new Array(... new Set(dateArray)).sort();
+
+				// Newcomer List
+				var newcomerArray = new Array();
+				// Name List
+				var nameArray = new Array();
+				// Reverse Order - Participant goes to last declare group
+				for (var all=lines.length-1; all>0; all--) {
+					// Temp Newcomers
+					var tempNewcomers = new Array();
+					// Split Newcomers
+					tempNewcomers = lines[all][INDEX_OF_NEWCOMERLIST].split(",").filter(n => n.trim().length > 0);
+
+					// Distinct Newcomers
+					for (var nameIndex=0; nameIndex<tempNewcomers.length; nameIndex++) {
+						// Push all newcomers in
+						newcomerArray.push(tempNewcomers[nameIndex].trim());
+					}
+					// Distinct (by Set) and sort
+					newcomerArray = new Array(... new Set(newcomerArray)).sort();
+
+
+					// Temp Names
+					var tempNames = new Array();
+					// Split Names
+					tempNames = lines[all][INDEX_OF_NAMELIST].split(",").filter(n => n.trim().length > 0);
+					//tempNames = tempNames.filter(function() { return true; });
+
+					// Distinct Names
+					for (var nameIndex=0; nameIndex<tempNames.length; nameIndex++) {
+						var isNew = true;
+						for (var finalNameIndex=0; finalNameIndex<nameArray.length; finalNameIndex++) {
+							// Compare Names
+							if (nameArray[finalNameIndex][0] == tempNames[nameIndex].trim()) {
+								isNew = false;
+							}
+						}
+
+						// Check is newcomer
+						var isNewcomer = false;
+						for (var newcomerIndex=0; newcomerIndex<newcomerArray.length; newcomerIndex++) {
+							if (tempNames[nameIndex].trim() == newcomerArray[newcomerIndex].trim()) {
+								isNewcomer = true;
+							}
+						}
+
+						if (isNew) {
+							// New participant found
+
+							// Participant data - {Name, Group, isNewcomer, ""}
+							// The empty string is space for attendance rate
+							var paritcipantData = new Array(tempNames[nameIndex].trim(), lines[all][INDEX_OF_GROUP], ((isNewcomer)?true:false), "");
+							// Mark attendance date, if don't know yet, put 0
+							for (var dateIndex=0; dateIndex<dateArray.length; dateIndex++) {
+								if (dateArray[dateIndex] == lines[all][INDEX_OF_DATE]) {  // Set Present if date matched
+									paritcipantData.push(PRESENT);
+								} else {
+									paritcipantData.push(ABSENT);
+								}
+							}
+							// Push Into Name Array
+							nameArray.push(paritcipantData);
+						} else {
+							// Find the participant
+							for (var participantIndex=0; participantIndex<nameArray.length; participantIndex++) {
+								if (nameArray[participantIndex][0] == tempNames[nameIndex].trim()) {
+									// Set as newcomer
+									nameArray[participantIndex][2] = isNewcomer;
+									// Participant already in list, mark attendance date
+									for (var dateIndex=0; dateIndex<dateArray.length; dateIndex++) {
+										if (dateArray[dateIndex] == lines[all][INDEX_OF_DATE]) {  // Set Present if date matched
+											// There are 4 fields ahead the attendance data
+											nameArray[participantIndex][dateIndex+NUMBER_OF_FIELDS_B4_ATTENDANCE] = PRESENT;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				nameArray.sort(sortByFirstColumn);
+
+				// Distinct Groups
+				var groupArray = new Array();
+				for (var all=1; all<lines.length; all++) {
+					// Push all groups in
+					groupArray.push(lines[all][INDEX_OF_GROUP].trim());
+				}
+				// Distinct (by Set) and sort
+				groupArray = new Array(... new Set(groupArray)).sort();
+
+
+				// Calculate Attendance Rate
+				for (var nameIndex=0; nameIndex<nameArray.length; nameIndex++) {
+					var countAttend = 0;
+					var totalDaysFromFirst = 0;
+
+					for (var attend=NUMBER_OF_FIELDS_B4_ATTENDANCE; attend<dateArray.length+NUMBER_OF_FIELDS_B4_ATTENDANCE; attend++) {
+						if (nameArray[nameIndex][attend] == PRESENT) {
+							// Accumulate attended dates
+							countAttend++;
+							// If attended, set the total days from first date
+							if (totalDaysFromFirst == 0) {
+								totalDaysFromFirst = dateArray.length + NUMBER_OF_FIELDS_B4_ATTENDANCE - attend;
+							}
+						}
+					}
+
+					// Set attendance rate
+					var decimalPlace = Math.pow(10, DECI_PLACE);
+					var rateFromFirstAttend = Math.round(countAttend / totalDaysFromFirst * 100 * decimalPlace) / decimalPlace;
+					var rateAllDates = Math.round(countAttend / dateArray.length * 100 * decimalPlace) / decimalPlace;
+
+					nameArray[nameIndex][3] = (
+						(nameArray[nameIndex][2])? // isNewcomer?
+							`<span class="${(rateFromFirstAttend < PASS_RATE)?"fail":"pass"}">${rateFromFirstAttend}%</span>` : // From first attend
+							`<span class="${(rateAllDates < PASS_RATE)?"fail":"pass"}">${rateAllDates}%<span>` // All dates count
+					);
+				}
+
+				// Final Display
+				var show = "";
+				// Filter
+				show += `<br/>${lines[0][INDEX_OF_GROUP]}: `;
+				show += `<span class="dropdown">`;
+				show += `  <select onchange="generate(this.value);">`;
+				show += `    <option value='' ${(groupFilter=="")?"selected":""}> *** ALL *** </option>`;
+				for (var g=0; g<groupArray.length; g++) {
+					show += `    <option ${(groupFilter==groupArray[g])?"selected":""}>${groupArray[g]}</option>`;	
+				}
+				show += `  </select> &nbsp;&nbsp;`;
+				show += `</span>`;
+				// Input Again Button
+				show += `<input type="button" class="button" value=" Input Again " `;
+				show += ` onclick='`;
+				show += `   document.getElementById("inputPanel").style.display = "block"; `;
+				show += `   document.getElementById("report").style.display = "none"; `;
+				show += ` '/>`;
+				show += `<br/><br/>`;
+				// Display Table
+				show += `<table>`;
+				show += `  <tr id="header" class="row">`;
+				show += `    <th>${lines[0][INDEX_OF_NAMELIST]}</th>`;
+				show += `    <th>${lines[0][INDEX_OF_GROUP]}</th>`;
+				show += `    <th>Rate</th>`;
+				show += `    <th>Attendance</th>`;
+				show += `  </tr>`;
+
+				for (var nameIndex=0; nameIndex<nameArray.length; nameIndex++) {
+					// Display All or Filtered by Group
+					if (groupFilter == "" || nameArray[nameIndex][1] == groupFilter) {
+						show += `  <tr class="row ${nameArray[nameIndex][1]}">`; // Set Group Name as Class
+						for (var dataIndex=0; dataIndex<dateArray.length+NUMBER_OF_FIELDS_B4_ATTENDANCE; dataIndex++) {
+
+							if (dataIndex < NUMBER_OF_FIELDS_B4_ATTENDANCE) {
+								if (dataIndex != 2) { // 2 - isNewcomer
+									// Name, Group, Rate
+									show += `    <td>${nameArray[nameIndex][dataIndex]}`;
+									show += (dataIndex == 0 && nameArray[nameIndex][2])?`<span class='new_sign'>&nbsp;${NEW_SIGN}</span>`:``; // Name && isNewcomer
+									show += `</td>`;
+								}
+							} else {
+								// Date List
+								var tempMonth = parseInt(dateArray[dataIndex-NUMBER_OF_FIELDS_B4_ATTENDANCE].split("-")[1], 10);
+								var tempDate = parseInt(dateArray[dataIndex-NUMBER_OF_FIELDS_B4_ATTENDANCE].split("-")[2], 10);
+
+								if (dataIndex == NUMBER_OF_FIELDS_B4_ATTENDANCE) {
+									// Starting of attendance bar
+									show += `<td><table class="attendance-bar"><tr>`;
+								}
+
+								// Attendance
+								var color = ((nameArray[nameIndex][dataIndex] == PRESENT)?"green":"red");
+
+								show += `    <td style="background-color: ${color};" `;
+								show += `     onmouseover="this.innerHTML='&nbsp;${tempDate}/${tempMonth}&nbsp;';" `;
+								show += `     onmouseout="setTimeout(()=>{this.innerHTML='';}, DATE_DISPLAY_TIME);">`;
+								show += `    </td>`;
+
+								if (dataIndex == dateArray.length+NUMBER_OF_FIELDS_B4_ATTENDANCE-1) {
+									// Ending of attendance bar
+									show += `</tr></table></td>`;
+								}
+							}
+						}
+						show += `  </tr>`;
+					}
+				}
+				show += `</table>`;
+
+				// Display
+				document.getElementById("report").innerHTML = show;
+				document.getElementById("report").style.display = "block";
+			}
+		</script>
+
+		<style>
+			div {
+				text-align: center;
+				font-family: Arial;
+				font-size: 16px;
+			}
+			textarea {
+				outline: none;
+				resize: none;
+				border: 5px solid #4CAF50; 
+				border-radius: 25px;
+				font-size: 16px;
+			}
+			table {
+				margin: 0 auto;
+				text-align: center;
+				border-collapse: collapse;
+
+				border-radius: 12px;
+				font-family: Arial;
+				font-size: 20px;
+			}
+			th:first-child { border-radius: 15px 0 0 0; } /* Table Top Left */
+			th:last-child { border-radius: 0 15px 0 0; } /* Table Top Right */
+			tr:last-child td:first-child { border-radius: 0 0 0 15px; } /* Table Bottom Left */
+			tr:last-child td:last-child { border-radius: 0 0 15px 0; } /* Table Bottom Right */
+			th, td { padding: 1.2rem; font-size: 1.3rem; }
+			tr, td { padding: 8px; transition: .2s ease-in; } 
+			tr:first-child {background: #4CAF50; } /* Header Color */
+			tr {background: #9CFFA0; } /* Row Background Color */
+			tr:nth-child(even) { background: #7CDF90; } /* Even Row Background Color */
+			tr:hover:not(#firstrow), tr:hover td:empty {
+				background: #CCFFC7; /* Hover Row Background Color */
+				pointer-events: visible;
+			}
+			tr:hover:not(#firstrow) {
+				transform: scale(1.02);
+				font-weight: 700;
+				box-shadow: 0px 3px 7px rgba(0, 0, 0, 0.5);
+			}
+
+			.fail {
+				font-weight: bold;
+				color: red;
+			}
+			.new_sign {
+				font-size: .7em;
+				font-style: italic;
+				font-weight: bold;
+				vertical-align: super;
+				color: red;
+			}
+			.button {
+				background-color: #4CAF50;
+				border: none;
+				border-radius: 12px;
+				color: #FFFFFF;
+				padding: 15px;
+				text-align: center;
+				text-decoration: none;
+				display: inline-block;
+				font-size: 16px;
+				margin: 4px 2px;
+			}
+			.dropdown {
+				position: relative;
+				display: inline-block;
+				vertical-align: middle;
+				margin: 10px; /* demo only */
+			}
+			.dropdown select {
+				background-color: #4CAF50;
+				color: #FFFFFF;
+				font-size: inherit;
+				padding: .5em;
+				padding-right: 2.5em; 
+				border: 0;
+				margin: 0;
+				border-radius: 12px;
+				text-indent: 0.01px;
+				text-overflow: '';
+				-webkit-appearance: button; /* hide default arrow in chrome OSX */
+			}
+			.attendance-bar {
+				border: 1px solid grey;
+				border-spacing: 4px;
+				border-collapse: separate;
+			}
+			.attendance-bar tr:hover {
+				/*transform: scale(1) !important;*/
+				transform: none !important;
+				box-shadow: 0 0 0 0 !important;
+			}
+			.attendance-bar tr td {
+				color: white !important;
+				width: 5px !important;
+				height: 25px !important;
+				padding: 0px !important;
+				border-radius: 0px !important;
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="inputPanel">
+			<textarea id="data" rows="15" cols="100"
+			 onchange="this.value=this.value.trim();"
+			 onkeyup="this.value=this.value.trim();"
+			 oninput="this.value=this.value.trim();"></textarea>
+			<br/><br/>
+			<input type="button" class="button" value="Clear" onclick="document.getElementById('data').value=''" />
+			<input type="button" class="button" value="Generate Report" onclick="generate('');" />
+		</div>
+		<div id="report"/>
+	</body>
+</html>
