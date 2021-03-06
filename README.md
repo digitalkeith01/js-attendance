@@ -11,11 +11,11 @@ https://digitalkeith01.medium.com/heavy-workload-to-create-an-attendance-system-
 
 ### Additional Gatherings "attendanceViewerAdditonal.html"
 
-One more field is added to the form. Please move the new column "Is it Additional?" to the right of date in data worksheet:
+One more field is added to the form. Please move the new column **"Is it Additional?"** to the right of "Date" in data worksheet:
 
 1. Timestamp (Created by system)
 2. Date [Date]
-3. ***Is it Additional? [Single Radiobox] ***
+3. **Is it Additional?** [Single Radiobox]
 4. Group [Selection]
 5. Participants [Text]
 6. New Comer [Text]
